@@ -232,7 +232,7 @@ io.on("connection", async(socket) => {
                 game_room[idx].ttl = timeToLive
                     // For Host
                 game_room[idx].host.forEach(e => {
-                    console.log(io.to(e.socketId).emit("hostRoomInfo", game_room[idx]))
+                    io.to(e.socketId).emit("hostRoomInfo", game_room[idx])
                         // // console.log(e)
                 })
             } else { // IS PLAYING 
@@ -240,13 +240,16 @@ io.on("connection", async(socket) => {
                 if (game_room[idx].playerData.findIndex(e => e.uuid == socket.uuid) != -1) { // have in player
                     socket.join(data.roomId)
                         // socket.join(socket.id)
-                    game_room[idx].playersOnline.push({ socketId: socket.id, uuid: socket.uuid, playerName: data.playerName })
+                    if (game_room[idx].playersOnline.findIndex(e => e.uuid == socket.uuid) == -1) { // add player
+                        game_room[idx].playersOnline.push({ socketId: socket.id, uuid: socket.uuid, playerName: data.playerName })
+
+                    }
 
                     game_room[idx].ttl = timeToLive
                         // For Host
                     socket.emit("playerRoomInfo", { roomStatus: "INPLAY" })
                     game_room[idx].host.forEach(e => {
-                        console.log(io.to(e.socketId).emit("hostRoomInfo", game_room[idx]))
+                        io.to(e.socketId).emit("hostRoomInfo", game_room[idx])
                             // // console.log(e)
                     })
 
@@ -269,6 +272,41 @@ io.on("connection", async(socket) => {
         io.in('debug').emit('debinfo', game_room)
 
 
+    })
+
+    socket.on("playerLeave", (data) => {
+        const idx = game_room.findIndex(e => {
+            return e.roomId == data.roomId
+        })
+
+        if (idx == -1) {
+            socket.emit("noRoom")
+        } else { // have room
+            const pos = game_room[idx].playersOnline.findIndex(e => {
+                return e.uuid == data.uuid
+            })
+
+            game_room[idx].playersOnline.splice(pos, 1)
+
+            if (idx != -1) { // Have Room 
+                game_room[idx].host.forEach(e => {
+                    io.to(e.socketId).emit("hostRoomInfo", game_room[idx])
+
+                    // // console.log(e)
+                })
+                socket.emit("noRoom")
+                socket.leave(data.roomId)
+
+
+            }
+            io.in('debug').emit('debinfo', game_room)
+
+            // socket.emit("playerRoomInfo", game_room[idx])
+
+
+
+
+        }
     })
 
     socket.on("roomStart", (data) => {
@@ -372,13 +410,15 @@ io.on("connection", async(socket) => {
             return e.uuid == data.uuid
         })
 
-        game_room[idx].playerData[pos] = data.playerData
+        game_room[idx].playerData[pos] = data.myPlayerData
 
         if (idx != -1) { // Have Room 
             game_room[idx].host.forEach(e => {
                 io.to(e.socketId).emit("hostGameInfo", { playerData: game_room[idx].playerData })
                     // // console.log(e)
             })
+            socket.emit("playerGameInfo", { gameData: game_room[idx].gameData, playerData: game_room[idx].playerData })
+
         }
         io.in('debug').emit('debinfo', game_room)
 
