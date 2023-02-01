@@ -6,8 +6,9 @@ const mariadb = require('mariadb')
 const app = express()
 const sock_app = express()
 const port = 9000
-const timeToLive = 3000
+const timeToLive = 300
 const { v4: uuidv4 } = require('uuid');
+const e = require('express');
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(bodyParser.raw());
@@ -79,11 +80,8 @@ let game_room = []
 
 io.on("connection", async(socket) => {
 
-    // uuidv4
-    // socket.id = await uuidv4();
-    // // console.log(socket.id)
-    // // console.log(socket.rooms)
-    // socket.id = await uuidv4();
+
+    // Don't Change socket.id [For Send One By One], Create UUID instead
     socket.uuid = await uuidv4();
     // // console.log(socket.rooms)
 
@@ -100,7 +98,6 @@ io.on("connection", async(socket) => {
             const get_roomId = generateRoomCode();
             const get_passCode = generatePassword(4);
             socket.join(get_roomId)
-                // socket.join(socket.id)
 
 
             // create data in array
@@ -278,7 +275,6 @@ io.on("connection", async(socket) => {
         const idx = game_room.findIndex(e => {
             return e.roomId == data.roomId
         })
-
         if (idx != -1) { // Have Room > Start Room
             // Change Status
             game_room[idx].roomStatus = "INPLAY"
@@ -291,18 +287,9 @@ io.on("connection", async(socket) => {
                 default:
                     break;
             }
-
-
-
-
-
             // Send To All in roomid
             io.in(data.roomId).emit("roomStart")
-
-
-
         }
-
         io.in('debug').emit('debinfo', game_room)
 
     })
@@ -335,7 +322,67 @@ io.on("connection", async(socket) => {
 
 
 
-    // For Guesstimate
+    // For Game
+
+    socket.on("hostGameInfo", (data) => {
+        const idx = game_room.findIndex(e => {
+            return e.roomId == data.roomId
+        })
+        if (idx != -1) { // Have Room > Get Data
+            socket.emit("hostGameInfo", { gameData: game_room[idx].gameData, playerData: game_room[idx].playerData })
+        }
+
+    })
+
+    socket.on("playerGameInfo", (data) => {
+        const idx = game_room.findIndex(e => {
+            return e.roomId == data.roomId
+        })
+        if (idx != -1) { // Have Room > Get Data
+
+            socket.emit("playerGameInfo", { gameData: game_room[idx].gameData, playerData: game_room[idx].playerData })
+        }
+    })
+
+    socket.on("hostGameUpdate", (data) => { // Host Game Update > Send All
+        const idx = game_room.findIndex(e => {
+            return e.roomId == data.roomId
+        })
+
+        game_room[idx].gameData = data.gameData
+        game_room[idx].playerData = data.playerData
+
+        game_room[idx].host.forEach(e => {
+            io.to(e.socketId).emit("hostGameInfo", { gameData: game_room[idx].gameData, playerData: game_room[idx].playerData })
+                // // console.log(e)
+        })
+        game_room[idx].playersOnline.forEach(e => {
+            io.to(e.socketId).emit("playerGameInfo", { gameData: game_room[idx].gameData, playerData: game_room[idx].playerData })
+        })
+        io.in('debug').emit('debinfo', game_room)
+
+    })
+
+    socket.on("playerGameUpdate", (data) => { // Player Game Update > Send To selt and Host Only
+        const idx = game_room.findIndex(e => {
+            return e.roomId == data.roomId
+        })
+
+        const pos = game_room[idx].playerData.findIndex(e => {
+            return e.uuid == data.uuid
+        })
+
+        game_room[idx].playerData[pos] = data.playerData
+
+        if (idx != -1) { // Have Room 
+            game_room[idx].host.forEach(e => {
+                io.to(e.socketId).emit("hostGameInfo", { playerData: game_room[idx].playerData })
+                    // // console.log(e)
+            })
+        }
+        io.in('debug').emit('debinfo', game_room)
+
+    })
 
 
 
@@ -352,9 +399,6 @@ io.on("connection", async(socket) => {
                     game_room[idx].playersOnline.splice(game_room[idx].playersOnline.findIndex(e => e.uuid == socket.uuid), 1);
                     game_room[idx].host.forEach(e => {
                         console.log(io.to(e.socketId).emit("hostRoomInfo", game_room[idx]))
-
-                        // console.log(io.to(e.socketId).emit("hostRoomInfo", game_room[idx]))
-                        // // console.log(e)
                     })
                 }
 
@@ -426,14 +470,16 @@ function start_GTM(idx) { // FOR ADMIN
     // 2 - Show Player Answer(Cannot Answered) 
     // 3 - Show Correct Answer(include calculate)
     game_room[idx].gameData.inGameStage = 0
-    game_room[idx].gameData["quiz"] = {
-        question_type: "", // E - Exactly | R1 - Range V1
+    game_room[idx].gameData["quiz"] = { // For Quiz Only
+        questionType: "", // E - Exactly | R1 - Range V1
         question: "",
-        questionexplain: "",
-        answer: "",
+        questionExplain: "",
         answerPrefix: "",
         answerSuffix: "",
 
+    }
+    game_room[idx].gameData["answer"] = { // For Answer Of Quiz [Spreate for admin]
+        answer: ""
     }
 
     // game_room[idx].gameData["playerData"] = []
@@ -446,8 +492,8 @@ function start_GTM(idx) { // FOR ADMIN
             max: null,
             size: null,
             ans: null,
-            lock_down: false,
-            answer_status: "", // correct_smallest,correct,correct_largest,incorrect
+            lockDown: false,
+            answerStatus: "", // correct_smallest,correct,correct_largest,incorrect
             score: 0
         })
     });
