@@ -513,6 +513,7 @@ function start_GTM(idx) { // FOR ADMIN
     game_room[idx].gameData["quiz"] = { // For Quiz Only
         questionType: "", // E - Exactly | R1 - Range V1
         question: "",
+        questionPic: "",
         questionExplain: "",
         answerPrefix: "",
         answerSuffix: "",
