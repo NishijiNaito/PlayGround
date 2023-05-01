@@ -230,6 +230,34 @@ io.on("connection", async (socket) => {
 
     })
 
+    socket.on("joinBySpectator", (roomId) => { // data only roomId
+        const idx = game_room.findIndex(e => {
+            return e.roomId == roomId
+        })
+
+        if (idx == -1) {
+            socket.emit("noRoom")
+        } else { // have room
+            socket.join(roomId + "_spec") // 000000_spec
+
+
+
+            game_room[idx].ttl = timeToLive
+
+            socket.emit("spectatorRoomInfo", game_room[idx])
+
+
+
+
+        }
+        // console.log(game_room)
+        // // console.log(socket.rooms)
+
+        io.in('debug').emit('debinfo', game_room)
+
+
+    })
+
     socket.on("joinByPlayer", (data) => {
         const idx = game_room.findIndex(e => {
             return e.roomId == data.roomId
@@ -263,6 +291,9 @@ io.on("connection", async (socket) => {
                     io.to(e.socketId).emit("hostRoomInfo", game_room[idx])
                     // // console.log(e)
                 })
+
+                io.in(game_room[idx].roomId + "_spec").emit("spectatorRoomInfo", game_room[idx])
+
             } else { // IS PLAYING 
                 socket.uuid = data.uuid
                 if (game_room[idx].playerData.findIndex(e => e.uuid == socket.uuid) != -1) { // have in player
@@ -280,6 +311,8 @@ io.on("connection", async (socket) => {
                         io.to(e.socketId).emit("hostRoomInfo", game_room[idx])
                         // // console.log(e)
                     })
+
+                    io.in(game_room[idx].roomId + "_spec").emit("spectatorRoomInfo", game_room[idx])
 
                 } else {
                     socket.emit("noRoom")
@@ -322,6 +355,7 @@ io.on("connection", async (socket) => {
 
                     // // console.log(e)
                 })
+                io.in(game_room[idx].roomId + "_spec").emit("spectatorRoomInfo", game_room[idx])
                 socket.emit("noRoom")
                 socket.leave(data.roomId)
 
@@ -355,6 +389,7 @@ io.on("connection", async (socket) => {
             }
             // Send To All in roomid
             io.in(data.roomId).emit("roomStart")
+            io.in(data.roomId + "_spec").emit("roomStart")
         }
         io.in('debug').emit('debinfo', game_room)
 
@@ -377,7 +412,7 @@ io.on("connection", async (socket) => {
 
             // Send To All in roomid
             io.in(data.roomId).emit("roomEnd")
-
+            io.in(data.roomId + "_spec").emit("roomEnd")
 
 
         }
@@ -400,6 +435,15 @@ io.on("connection", async (socket) => {
 
     })
 
+    socket.on("spectatorGameInfo", (roomId) => {
+        const idx = game_room.findIndex(e => {
+            return e.roomId == roomId
+        })
+        if (idx != -1) { // Have Room > Get Data
+            socket.emit("spectatorGameInfo", { gameData: game_room[idx].gameData, playerData: game_room[idx].playerData })
+        }
+    })
+
     socket.on("playerGameInfo", (data) => {
         const idx = game_room.findIndex(e => {
             return e.roomId == data.roomId
@@ -418,18 +462,23 @@ io.on("connection", async (socket) => {
         game_room[idx].gameData = data.gameData
         game_room[idx].playerData = data.playerData
 
+        //send all host
         game_room[idx].host.forEach(e => {
             io.to(e.socketId).emit("hostGameInfo", { gameData: game_room[idx].gameData, playerData: game_room[idx].playerData })
             // // console.log(e)
         })
+        //send all player
         game_room[idx].playersOnline.forEach(e => {
             io.to(e.socketId).emit("playerGameInfo", { gameData: game_room[idx].gameData, playerData: game_room[idx].playerData })
         })
+        //send all spctator
+        io.in(game_room[idx].roomId + "_spec").emit("spectatorGameInfo", { gameData: game_room[idx].gameData, playerData: game_room[idx].playerData })
+
         io.in('debug').emit('debinfo', game_room)
 
     })
 
-    socket.on("playerGameUpdate", (data) => { // Player Game Update > Send To selt and Host Only
+    socket.on("playerGameUpdate", (data) => { // Player Game Update > Send To selt ,spectator and Host Only
         const idx = game_room.findIndex(e => {
             return e.roomId == data.roomId
         })
@@ -441,11 +490,16 @@ io.on("connection", async (socket) => {
         game_room[idx].playerData[pos] = data.myPlayerData
 
         if (idx != -1) { // Have Room 
+            //send to host
             game_room[idx].host.forEach(e => {
                 io.to(e.socketId).emit("hostGameInfo", { playerData: game_room[idx].playerData })
                 // // console.log(e)
             })
+            //send back to player
             socket.emit("playerGameInfo", { gameData: game_room[idx].gameData, playerData: game_room[idx].playerData })
+            //send to spectator
+            io.in(game_room[idx].roomId + "_spec").emit("spectatorGameInfo", { playerData: game_room[idx].playerData })
+
 
         }
         io.in('debug').emit('debinfo', game_room)
@@ -468,6 +522,7 @@ io.on("connection", async (socket) => {
                 game_room[idx].host.forEach(e => {
                     console.log(io.to(e.socketId).emit("hostRoomInfo", game_room[idx]))
                 })
+                io.in(game_room[idx].roomId + "_spec").emit("spectatorRoomInfo", game_room[idx])
             }
 
 
