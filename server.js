@@ -176,7 +176,7 @@ io.on("connection", async (socket) => {
                     socket.emit("startJoinComplete", {
                         roomId: data.roomId,
                         mode: "player",
-                        game: data.game,
+                        game: game_room[idx].game,
                         uuid: socket.uuid,
                         playerName: data.playerName
                     })
@@ -383,7 +383,9 @@ io.on("connection", async (socket) => {
                 case "GTM":
                     start_GTM(idx)
                     break;
-
+                case "WDWH":
+                    start_WDWH(idx)
+                    break;
                 default:
                     break;
             }
@@ -497,6 +499,38 @@ io.on("connection", async (socket) => {
             })
             //send back to player
             socket.emit("playerGameInfo", { gameData: game_room[idx].gameData, playerData: game_room[idx].playerData })
+            //send to spectator
+            io.in(game_room[idx].roomId + "_spec").emit("spectatorGameInfo", { playerData: game_room[idx].playerData })
+
+
+        }
+        io.in('debug').emit('debinfo', game_room)
+
+    })
+
+    socket.on("playerGameUpdateAll", (data) => { // Player Game Update > Send To selt ,spectator and Host Only
+        const idx = game_room.findIndex(e => {
+            return e.roomId == data.roomId
+        })
+
+        const pos = game_room[idx].playerData.findIndex(e => {
+            return e.uuid == data.uuid
+        })
+
+        game_room[idx].playerData[pos] = data.myPlayerData
+
+        if (idx != -1) { // Have Room 
+            //send to host
+            game_room[idx].host.forEach(e => {
+                io.to(e.socketId).emit("hostGameInfo", { playerData: game_room[idx].playerData })
+                // // console.log(e)
+            })
+            //send back to player NO NEED BECAUSE USED BY SEND ALL PLAYER
+            // socket.emit("playerGameInfo", { gameData: game_room[idx].gameData, playerData: game_room[idx].playerData })
+            //send all player
+            game_room[idx].playersOnline.forEach(e => {
+                io.to(e.socketId).emit("playerGameInfo", { gameData: game_room[idx].gameData, playerData: game_room[idx].playerData })
+            })
             //send to spectator
             io.in(game_room[idx].roomId + "_spec").emit("spectatorGameInfo", { playerData: game_room[idx].playerData })
 
@@ -622,6 +656,41 @@ function start_GTM(idx) { // FOR ADMIN
         })
     });
 
+}
+
+function start_WDWH(idx) {
+    // 01 set word
+    // 02 shuffle word
+    // 03 shuffle category
+    // 04 write story
+    // 05 reading story
+    // 06 give ranking
+    // 07 reveal ranking point
+    game_room[idx].gameData.phase = 1
+    game_room[idx].gameData.category = ""
+    game_room[idx].gameData.player_order = []
+    game_room[idx].gameData.player_present_now = ""
+
+    game_room[idx].playersOnline.forEach(e => {
+        game_room[idx].playerData.push({
+            uuid: e.uuid,
+            playerName: e.playerName,
+            score: 0,
+            score_vote: 0,
+            q_who: "",
+            q_do: "",
+            q_where: "",
+            q_how: "",
+            word_set: [],
+            short_story: "",
+            show_short_story: "",
+            short_story_postion: -1,
+            short_story_all_split: null,
+            send_score: [],
+            is_ready: false,
+
+        })
+    });
 }
 
 
