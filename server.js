@@ -386,6 +386,9 @@ io.on("connection", async (socket) => {
                 case "WDWH":
                     start_WDWH(idx)
                     break;
+                case "NFS":
+                    start_NFS(idx)
+                    break;
                 default:
                     break;
             }
@@ -693,7 +696,44 @@ function start_WDWH(idx) {
     });
 }
 
+function start_NFS(idx) {
+    // 00 Settings Game (can back)
+    // 01 shuffle category
+    // 02 Random Number
+    // 03 write story
+    // 04 reading story / Tell Story
+    // 05 guess most & least
+    // 06 reveal Answer
+    // 07 Reveal Correct & challenge End Here
+    // 08 Result
+    game_room[idx].gameData.phase = 0
+    game_room[idx].gameData.writing = false // phase 03 จะเขียนหรือเล่า
+    game_room[idx].gameData.category = "" // หมวดหมู่
+    game_room[idx].gameData.result = { mostLevel: null, leastLevel: null }; // เลขมากสุด - น้อยสุด
+    game_room[idx].gameData.player_order = [] // ลำดับของผู้เล่น
+    game_room[idx].gameData.player_present_now = "" //ผู้เล่นปัจจุบัน
 
+    game_room[idx].playersOnline.forEach(e => {
+        game_room[idx].playerData.push({
+            uuid: e.uuid,
+            playerName: e.playerName,
+            score: 0, // คะแนนทั้งหมด
+
+            level: null, // ระดับของเรื่องเล่า
+
+            score_guess: 0, // คะแนนที่ได้จากรอบ
+            score_challenged: 0, // จำนวนที่ถูก Challenge
+            short_story: "", // เรื่องเล่า
+            show_short_story: "",
+            short_story_postion: -1, // ตำแหน่งที่แสดง
+            short_story_all_split: null, // ส่วนที่แสดงทั้งหมด
+            send_answer: { mostPlayer: null, leastPlayer: null }, // คำตอบ คนที่มีเลขสูงสุด ต่ำสุด
+            challenge_list: [], //รายชื่อที่จะ Challenge
+            is_ready: false,
+
+        })
+    });
+}
 
 
 websockServer.listen(3000)
