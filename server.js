@@ -371,6 +371,73 @@ io.on("connection", async (socket) => {
         }
     })
 
+    socket.on("hostLeave", (data) => {
+        const idx = game_room.findIndex(e => {
+            return e.roomId == data.roomId
+        })
+
+        if (idx == -1) {
+            socket.emit("noRoom")
+        } else { // have room
+            const pos = game_room[idx].host.findIndex(e => {
+                return e.uuid == data.uuid
+            })
+
+            game_room[idx].host.splice(pos, 1)
+
+            if (idx != -1) { // Have Room 
+                game_room[idx].host.forEach(e => {
+                    io.to(e.socketId).emit("hostRoomInfo", game_room[idx])
+
+                    // // console.log(e)
+                })
+                io.in(game_room[idx].roomId + "_spec").emit("spectatorRoomInfo", game_room[idx])
+                socket.emit("noRoom")
+                socket.leave(data.roomId)
+
+
+            }
+            io.in('debug').emit('debinfo', game_room)
+
+            // socket.emit("playerRoomInfo", game_room[idx])
+
+
+
+
+        }
+    })
+    socket.on("hostDestroy", (data) => {
+        const idx = game_room.findIndex(e => {
+            return e.roomId == data.roomId
+        })
+
+        if (idx == -1) {
+            socket.emit("noRoom")
+        } else { // have room > Let's Destroy
+
+
+            console.log("Room " + game_room[idx].roomId + " was deleted")
+            io.in(game_room[idx].roomId).emit("noRoom");
+            io.in(game_room[idx].roomId).socketsLeave(game_room[idx].roomId);
+
+            io.in(game_room[idx].roomId + "_spec").emit("noRoom");
+            io.in(game_room[idx].roomId + "_spec").socketsLeave(game_room[idx].roomId + "_spec");
+
+
+            game_room.splice(idx, 1)
+
+
+
+            io.in('debug').emit('debinfo', game_room)
+
+            // socket.emit("playerRoomInfo", game_room[idx])
+
+
+
+
+        }
+    })
+
     socket.on("roomStart", (data) => {
         const idx = game_room.findIndex(e => {
             return e.roomId == data.roomId
@@ -597,6 +664,12 @@ setInterval(() => {
         // // console.log(e.roomId + " : " + e.ttl)
         if (e.ttl < 0) {
             // console.log(e.roomId + " was deleted [No one has been in the room for 2 min.]")
+
+            io.in(game_room[idx].roomId).emit("noRoom");
+            io.in(game_room[idx].roomId).socketsLeave(game_room[idx].roomId);
+
+            io.in(game_room[idx].roomId + "_spec").emit("noRoom");
+            io.in(game_room[idx].roomId + "_spec").socketsLeave(game_room[idx].roomId + "_spec");
             game_room.splice(i, 1)
         }
     })
