@@ -6,7 +6,7 @@ const mariadb = require('mariadb')
 const app = express()
 const sock_app = express()
 const port = 9000
-const timeToLive = 300
+const timeToLive = 120
 const { v4: uuidv4 } = require('uuid');
 const e = require('express');
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -115,6 +115,8 @@ io.on("connection", async (socket) => {
         game: data.game,
         host: [{ socketId: socket.id, uuid: socket.uuid }],
         gameData: {},
+        answerData: {}, // For Answer Prevent See in F12
+        timerData: {},
         playerData: [],
         playersOnline: [], // array of id
         ttl: timeToLive
@@ -313,7 +315,7 @@ io.on("connection", async (socket) => {
         socket.uuid = data.uuid
         if (game_room[idx].playerData.findIndex(e => e.uuid == socket.uuid) != -1) { // have in player
           socket.join(data.roomId)
-          socket.join(data.roomId + "play")
+          socket.join(data.roomId + "_play")
           // socket.join(socket.id)
           if (game_room[idx].playersOnline.findIndex(e => e.uuid == socket.uuid) == -1) { // add player
             game_room[idx].playersOnline.push({ socketId: socket.id, uuid: socket.uuid, playerName: data.playerName })
@@ -413,7 +415,7 @@ io.to(e.socketId).emit("hostRoomInfo", game_room[idx])
 
         game_room[idx].host.splice(pos, 1) // cut
         socket.leave(data.roomId)
-        socket.leave(data.roomId + 'host')
+        socket.leave(data.roomId + '_host')
 
 
         io.in(game_room[idx].roomId + "_host").emit("hostRoomInfo", game_room[idx])
@@ -489,6 +491,9 @@ io.to(e.socketId).emit("hostRoomInfo", game_room[idx])
         case "NFS":
           start_NFS(idx)
           break;
+        case "KTC":
+          start_KTC(idx)
+          break;
         default:
           break;
       }
@@ -508,6 +513,8 @@ io.to(e.socketId).emit("hostRoomInfo", game_room[idx])
       // Change Status & Clear Game Stat
       game_room[idx].roomStatus = "REG"
       game_room[idx].gameData = {}
+      game_room[idx].answerData = {}
+      game_room[idx].timerData = {}
       game_room[idx].playerData = []
 
 
@@ -533,7 +540,7 @@ io.to(e.socketId).emit("hostRoomInfo", game_room[idx])
       return e.roomId == data.roomId
     })
     if (idx != -1) { // Have Room > Get Data
-      socket.emit("hostGameInfo", { gameData: game_room[idx].gameData, playerData: game_room[idx].playerData })
+      socket.emit("hostGameInfo", { gameData: game_room[idx].gameData, playerData: game_room[idx].playerData, answerData: game_room[idx].answerData, timerData: game_room[idx].timerData })
     }
 
   })
@@ -543,7 +550,7 @@ io.to(e.socketId).emit("hostRoomInfo", game_room[idx])
       return e.roomId == roomId
     })
     if (idx != -1) { // Have Room > Get Data
-      socket.emit("spectatorGameInfo", { gameData: game_room[idx].gameData, playerData: game_room[idx].playerData })
+      socket.emit("spectatorGameInfo", { gameData: game_room[idx].gameData, playerData: game_room[idx].playerData, timerData: game_room[idx].timerData })
     }
   })
 
@@ -553,7 +560,7 @@ io.to(e.socketId).emit("hostRoomInfo", game_room[idx])
     })
     if (idx != -1) { // Have Room > Get Data
 
-      socket.emit("playerGameInfo", { gameData: game_room[idx].gameData, playerData: game_room[idx].playerData })
+      socket.emit("playerGameInfo", { gameData: game_room[idx].gameData, playerData: game_room[idx].playerData, timerData: game_room[idx].timerData })
     }
   })
 
@@ -562,12 +569,23 @@ io.to(e.socketId).emit("hostRoomInfo", game_room[idx])
       return e.roomId == data.roomId
     })
 
-    game_room[idx].gameData = data.gameData
-    game_room[idx].playerData = data.playerData
+    let sendingData = {}
 
-    //send all host
-    io.in(game_room[idx].roomId + "_host").emit("hostGameInfo", { gameData: game_room[idx].gameData, playerData: game_room[idx].playerData })
+    if (data.gameData) {
+      game_room[idx].gameData = data.gameData
+      sendingData.gameData = game_room[idx].gameData
+    }
+    if (data.playerData) {
+      game_room[idx].playerData = data.playerData
+      sendingData.playerData = game_room[idx].playerData
 
+    }
+
+    if (data.timerData) {
+      game_room[idx].timerData = data.timerData
+      sendingData.timerData = game_room[idx].timerData
+
+    }
     /*
     game_room[idx].host.forEach(e => {
       io.to(e.socketId).emit("hostGameInfo", { gameData: game_room[idx].gameData, playerData: game_room[idx].playerData })
@@ -575,14 +593,24 @@ io.to(e.socketId).emit("hostRoomInfo", game_room[idx])
     })
     */
     //send all player
-    io.in(game_room[idx].roomId + "_play").emit("playerGameInfo", { gameData: game_room[idx].gameData, playerData: game_room[idx].playerData })
+    io.in(game_room[idx].roomId + "_play").emit("playerGameInfo", sendingData)
     /*
     game_room[idx].playersOnline.forEach(e => {
       io.to(e.socketId).emit("playerGameInfo", { gameData: game_room[idx].gameData, playerData: game_room[idx].playerData })
     })
     */
     //send all spctator
-    io.in(game_room[idx].roomId + "_spec").emit("spectatorGameInfo", { gameData: game_room[idx].gameData, playerData: game_room[idx].playerData })
+    io.in(game_room[idx].roomId + "_spec").emit("spectatorGameInfo", sendingData)
+
+    if (data.answerData) {
+      game_room[idx].answerData = data.answerData
+      sendingData.answerData = game_room[idx].answerData
+
+    }
+    //send all host
+    io.in(game_room[idx].roomId + "_host").emit("hostGameInfo", sendingData)
+
+
 
     io.in('debug').emit('debinfo', game_room)
 
@@ -610,7 +638,7 @@ io.to(e.socketId).emit("hostRoomInfo", game_room[idx])
       })
       */
       //send back to player
-      socket.emit("playerGameInfo", { gameData: game_room[idx].gameData, playerData: game_room[idx].playerData })
+      socket.emit("playerGameInfo", { playerData: game_room[idx].playerData })
       //send to spectator
       io.in(game_room[idx].roomId + "_spec").emit("spectatorGameInfo", { playerData: game_room[idx].playerData })
 
@@ -643,7 +671,7 @@ io.to(e.socketId).emit("hostRoomInfo", game_room[idx])
       //send back to player NO NEED BECAUSE USED BY SEND ALL PLAYER
       // socket.emit("playerGameInfo", { gameData: game_room[idx].gameData, playerData: game_room[idx].playerData })
       //send all player
-      io.in(game_room[idx].roomId + "_play").emit("playerGameInfo", { gameData: game_room[idx].gameData, playerData: game_room[idx].playerData })
+      io.in(game_room[idx].roomId + "_play").emit("playerGameInfo", { playerData: game_room[idx].playerData })
       /*
       game_room[idx].playersOnline.forEach(e => {
         io.to(e.socketId).emit("playerGameInfo", { gameData: game_room[idx].gameData, playerData: game_room[idx].playerData })
@@ -720,11 +748,11 @@ setInterval(() => {
     if (e.ttl < 0) {
       // console.log(e.roomId + " was deleted [No one has been in the room for 2 min.]")
 
-      io.in(game_room[idx].roomId).emit("noRoom");
-      io.in(game_room[idx].roomId).socketsLeave(game_room[idx].roomId);
-      io.in(game_room[idx].roomId + "_host").socketsLeave(game_room[idx].roomId + "_host");
-      io.in(game_room[idx].roomId + "_play").socketsLeave(game_room[idx].roomId + "_play");
-      io.in(game_room[idx].roomId + "_spec").socketsLeave(game_room[idx].roomId + "_spec");
+      io.in(e.roomId).emit("noRoom");
+      io.in(e.roomId).socketsLeave(e.roomId);
+      io.in(e.roomId + "_host").socketsLeave(e.roomId + "_host");
+      io.in(e.roomId + "_play").socketsLeave(e.roomId + "_play");
+      io.in(e.roomId + "_spec").socketsLeave(e.roomId + "_spec");
       game_room.splice(i, 1)
     }
   })
@@ -861,6 +889,58 @@ function start_NFS(idx) {
 
     })
   });
+}
+
+function start_KTC(idx) {
+  // 0 - setup 
+  // 1 - prepareQuiz 
+  // 2 - ShowQuiz
+  // 3 - Place Chip (Answer the question) 
+  // 4 - Lock Down (Time up for answer)
+  // 5 - Reveal Player Answer
+  // 6 - Reveal Correct Answer
+  // 7 - Summary Remaining
+  game_room[idx].gameData.phase = 0
+
+
+  game_room[idx].gameData["quiz"] = { // For Quiz Only
+    quiz_topic: "", // หัวข้อ
+    quiz_question: "", // คำถาม
+    quiz_choice: [], // ตัวเลือก
+    quiz_picLink: "", // Link รูปคำถาม
+
+  }
+  game_room[idx].gameData["answer"] = { // For Answer Of Quiz 
+    answer: "" // ต้องตรงกับ quiz_choice ทุกตัวอักษร
+  }
+
+
+  game_room[idx].answerData = {
+    answer: ""
+  }
+
+  game_room[idx].timerData = {
+    fullTime: null,
+    remainTime: null,
+    millTime: null,
+  }
+
+
+  // game_room[idx].gameData["playerData"] = []
+
+  game_room[idx].playersOnline.forEach(e => {
+    game_room[idx].playerData.push({
+      uuid: e.uuid,
+      playerName: e.playerName,
+
+      chip_tmp: 0, // use for temp when write wrong question 
+      chip_remain: 0,
+      chip_unchoose: 0,
+      chip_choice: [], // [1,2,3,4,5,6]
+      lockDown: false
+    })
+  });
+
 }
 
 
