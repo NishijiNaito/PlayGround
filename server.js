@@ -494,6 +494,9 @@ io.to(e.socketId).emit("hostRoomInfo", game_room[idx])
         case "KTC":
           start_KTC(idx)
           break;
+        case "CC":
+          start_CC(idx)
+          break;
         default:
           break;
       }
@@ -943,5 +946,71 @@ function start_KTC(idx) {
 
 }
 
+function start_CC(idx) {
+  // -1 - setup Game 
+  // 0 - Edit Detail
+  // 1 - prepareQuiz 
+  // 2 - ShowTopic / Place Bet Play
+  // 3 - ShowBet / ShowQuiz
+  // 4 - Show Answer
+  // 5 - Place Chip (Answer the question) 
+  // 6 - Lock Down (Time up for answer)
+  // 7 - Reveal Player Answer
+  // 8 - Reveal Correct Answer
+  // 9 - Summary Remaining
+  game_room[idx].gameData.phase = -1
+
+  // 0 - No Show
+  // 1+ - Show / By Order
+  game_room[idx].gameData.showNow = 0
+  game_room[idx].gameData.requireQuizPlay = 0
+  game_room[idx].gameData.requireChipPerQuiz = 1
+  game_room[idx].gameData.nowQuiz = 0
+
+
+  game_room[idx].gameData["quiz"] = { // For Quiz Only
+    quiz_topic: "", // หัวข้อ
+    quiz_question: "", // คำถาม
+    quiz_choice: [], // ตัวเลือก
+    quiz_picLink: "", // Link รูปคำถาม
+
+  }
+  game_room[idx].gameData["answer"] = { // For Answer Of Quiz 
+    answer: "" // ต้องตรงกับ quiz_choice ทุกตัวอักษร
+  }
+
+
+  game_room[idx].answerData = {
+    answer: ""
+  }
+
+  game_room[idx].timerData = {
+    fullTime: null,
+    remainTime: null,
+    millTime: null,
+  }
+
+
+  // game_room[idx].gameData["playerData"] = []
+
+  game_room[idx].playersOnline.forEach(e => {
+    game_room[idx].playerData.push({
+      uuid: e.uuid,
+      playerName: e.playerName,
+
+      chip_unscore: 0, // Unscored Chip
+      chip_inplay: 0, // Play Chip
+      quiz_play_remain: 0,
+      score: 0, // Score Form Correct answer Chip
+      result_quiz_score: 0,
+
+      chip_unchoose: 0,
+      chip_choice: [], // [1,2,3,4,5,6]
+      quiz_play: false,
+      lockDown: false
+    })
+  });
+
+}
 
 websockServer.listen(3000)
