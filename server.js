@@ -91,7 +91,7 @@ io.on("connection", async (socket) => {
   // Player     : 000000_play
   // Spectator  : 000000_spec
 
-  console.log("Socket Connected by " + socket.id)
+  console.log("Socket Connected by " + socket.id + " / uuid : " + socket.uuid)
 
 
   // For Manage Room
@@ -291,6 +291,7 @@ io.on("connection", async (socket) => {
           game_room[idx].playersOnline.push({ socketId: socket.id, uuid: socket.uuid, playerName: data.playerName })
 
           //send to host
+          console.log("Rejoin Room " + data.roomId + " / " + socket.id + " / uuid : " + socket.uuid)
 
 
 
@@ -316,6 +317,8 @@ io.on("connection", async (socket) => {
         if (game_room[idx].playerData.findIndex(e => e.uuid == socket.uuid) != -1) { // have in player
           socket.join(data.roomId)
           socket.join(data.roomId + "_play")
+          console.log("Rejoin Room " + data.roomId + " / " + socket.id + " / uuid : " + socket.uuid)
+
           // socket.join(socket.id)
           if (game_room[idx].playersOnline.findIndex(e => e.uuid == socket.uuid) == -1) { // add player
             game_room[idx].playersOnline.push({ socketId: socket.id, uuid: socket.uuid, playerName: data.playerName })
@@ -969,19 +972,24 @@ function start_CC(idx) {
 
 
   game_room[idx].gameData["quiz"] = { // For Quiz Only
+    quiz_type: "", // MCQ / SORT
+
     quiz_topic: "", // หัวข้อ
     quiz_question: "", // คำถาม
-    quiz_choice: [], // ตัวเลือก
+    quiz_choice: [], // ตัวเลือก / คำตอบที่เรียงแล้ว และจะถูก
     quiz_picLink: "", // Link รูปคำถาม
 
   }
   game_room[idx].gameData["answer"] = { // For Answer Of Quiz 
-    answer: "" // ต้องตรงกับ quiz_choice ทุกตัวอักษร
+    answer: "", // ต้องตรงกับ quiz_choice ทุกตัวอักษร
+    answer_sort: []
   }
 
 
   game_room[idx].answerData = {
-    answer: ""
+    answer: "",
+    answer_sort: []
+
   }
 
   game_room[idx].timerData = {
@@ -1006,6 +1014,15 @@ function start_CC(idx) {
 
       chip_unchoose: 0,
       chip_choice: [], // [1,2,3,4,5,6]
+
+
+      my_helper: { // ตัวช่วย
+        fold: 0, // หมอบ
+        cut2c: 0, // ตัด 2 ตัวเลือก
+        cut2c_cut: []
+      },
+
+
       quiz_play: false,
       lockDown: false
     })
