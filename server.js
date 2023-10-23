@@ -982,14 +982,15 @@ function start_CC(idx) {
   }
   game_room[idx].gameData["answer"] = { // For Answer Of Quiz 
     answer: "", // ต้องตรงกับ quiz_choice ทุกตัวอักษร
-    answer_sort: []
+    answer_sort: [],
+    answer_detail: ""
   }
 
 
   game_room[idx].answerData = {
     answer: "",
-    answer_sort: []
-
+    answer_sort: [],
+    answer_detail: ""
   }
 
   game_room[idx].timerData = {
